@@ -4,40 +4,40 @@ let Validator = require("validatorjs");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { db } = require("../config/database");
+const fs = require("fs");
 const auth = require("../middleware/auth");
 const { QueryTypes } = require("sequelize");
 const express = require("express");
 const { escapeLiteral } = require("pg");
-const moment = require('moment');
+const moment = require("moment");
 const router = express.Router();
-const nodemailer = require('nodemailer');
-const upload = require('../config/multerconfig')
-const {Server, Socket} = require("socket.io")
-const { createServer } = require('node:http');
+const nodemailer = require("nodemailer");
+const upload = require("../config/multerconfig");
+const { Server, Socket } = require("socket.io");
+const { createServer } = require("node:http");
 const app = express();
 const server = createServer(app);
 const io = new Server(server);
+const rsa = require("node-rsa");
+
+const private_key = fs. readFileSync("./key/private.pem", "utf8");
 
 
+//makeing the Privet Key
+// const key = new NodeRSA ({ b : 1024 });//Combo of public key and private Key
+// let secret = "This is the Secret";
+// var encryptString = key.encrypt(secret, "base64");
 
-// testing socket.io
+// node RSA start
+const payload = {};
+payload.UserName = "Gatik";
+payload.userID = "11223344";
 
-io.on('connection' , (socket) => {
-  console.log('a user connected')
-});
+const issueto = "GatikSharma";
+const sub = "gatikwrking@gmail.com";
+const exp = "99h";
 
-
-
-//end
-
-
-
-// const multer = require('multer')
-// const multerconfig = require('../config/multerconfig')
-// const upload = req
-
-
-router.post("/signUp",[upload.single("file")], async (req, res) => {
+router.post("/signUp", [upload.single("file")], async (req, res) => {
   try {
     const body = req.body;
     let password = await bcrypt.hash(body.password, 10);
@@ -87,7 +87,7 @@ router.post("/signUp",[upload.single("file")], async (req, res) => {
           lastName: body.lastName,
           email: body.email,
           password: password,
-          date: moment().tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss")
+          date: moment().tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss"),
         },
 
         type: db.QueryTypes.SELECT,
@@ -136,9 +136,9 @@ router.post("/login", async (req, res) => {
 
     if (!queryResult) {
       return res.status(400).json({
-        status:"Failed",
-        messgae:"record not found"
-      })
+        status: "Failed",
+        messgae: "record not found",
+      });
     }
     // Assign the first (and only) user record to userRecord
     userRecord = queryResult[0];
@@ -154,20 +154,21 @@ router.post("/login", async (req, res) => {
         message: "Server error: Invalid user data.",
       });
     }
-      const queryResultforblock = await db.query("SELECT ammountoftry FROM users WHERE email = :email",
+    const queryResultforblock = await db.query(
+      "SELECT ammountoftry FROM users WHERE email = :email",
       {
         replacements: { email: email },
         type: QueryTypes.SELECT,
       }
     );
-    console.log(queryResultforblock)
+    console.log(queryResultforblock);
 
-      if (queryResultforblock[0].ammountoftry > 3) {
-        return res.status(401).json({
-          status:"you are blocked",
-          message: "you dont have access of your account",
-        });
-      }
+    if (queryResultforblock[0].ammountoftry > 3) {
+      return res.status(401).json({
+        status: "you are blocked",
+        message: "you dont have access of your account",
+      });
+    }
     // 5. Comparing the plaintext password with the hashed password using bcrypt (Promise-based)
     const isMatch = await bcrypt.compare(password, queryResult[0].password);
 
@@ -175,48 +176,70 @@ router.post("/login", async (req, res) => {
       const token = jwt.sign({ email }, process.env.JWT_SECRET_KEY, {
         expiresIn: "40d",
       });
+
+      console.log("Token",token);
+      const public = fs.readFileSync("./key/public.pem", "utf8");
+      
+      const publicKey = new rsa();
+      publicKey.importKey(public);
+
+      const encryptToken = publicKey.encrypt(token, "base64");
+
+      console.log("Encrypted token", encryptToken);
+
       return res.status(200).json({
         status: "success",
         message: "Welcome to the website",
-        token,
+        encryptToken,
       });
     } else {
       const tryincriment = queryResult[0].ammountoftry + 1;
-        await db.query(`UPDATE users SET ammountoftry = :try WHERE email = :email`,
-          {replacements: {try: tryincriment , email: email , type: QueryTypes.UPDATE,}});
+      await db.query(
+        `UPDATE users SET ammountoftry = :try WHERE email = :email`,
+        {
+          replacements: {
+            try: tryincriment,
+            email: email,
+            type: QueryTypes.UPDATE,
+          },
+        }
+      );
 
       if (queryResultforblock[0].ammountoftry > 3) {
         const transporter = nodemailer.createTransport({
-          secure:true,
-          host:'smtp.gmail.com',
-          port:465, 
-          auth:{
-            user:"gatikwrking@gmail.com",
-            pass:"mjklvaxvqumhltfr"
-          }
-        })
-        function sendMail(to,sub,msg){
-          transporter.sendMail({
-            to:to,
-            subject:sub,
-            html:msg
-          })
-          console.log("email Sent"); 
-        }
-        sendMail("gatikwrking@gmail.com", "Blocked from your own api", "This is a corfirmation mail that you are blocked from website access and not able t access the information")
-        return res.status(401).json({
-          status:"you are blocked",
-          message: "you dont have access of your account we have also sent you confirmation mail that your account have been blocked",
+          secure: true,
+          host: "smtp.gmail.com",
+          port: 465,
+          auth: {
+            user: "gatikwrking@gmail.com",
+            pass: "mjklvaxvqumhltfr",
+          },
         });
-      } else{
+        function sendMail(to, sub, msg) {
+          transporter.sendMail({
+            to: to,
+            subject: sub,
+            html: msg,
+          });
+          console.log("email Sent");
+        }
+        sendMail(
+          "gatikwrking@gmail.com",
+          "Blocked from your own api",
+          "This is a corfirmation mail that you are blocked from website access and not able t access the information"
+        );
+        return res.status(401).json({
+          status: "you are blocked",
+          message:
+            "you dont have access of your account we have also sent you confirmation mail that your account have been blocked",
+        });
+      } else {
         res.status(400).json({
-          status:"Failed",
+          status: "Failed",
           message: "Email or password is incorrect you have limited tryes",
-
         });
       }
     }
-
   } catch (err) {
     console.log("error", err);
     return;
