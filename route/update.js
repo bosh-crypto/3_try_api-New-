@@ -10,6 +10,7 @@ router.post("/update", [auth.isAuth], async (req, res) => {
   const { firstName, lastName } = req.body;
 
   try {
+    console.log("Req.body",req.body);
     // 1. Check if email exists
     const searchemail = await db.query(
       "SELECT email , ammountoftry FROM users WHERE email = :email",
@@ -34,12 +35,14 @@ router.post("/update", [auth.isAuth], async (req, res) => {
         message: "you dont have access of your account😥😥😥😭😭😭",
       });
     }
+
+    console.log(firstName)
     // 2. Perform the update
     const updateing = await db.query(
       `UPDATE users SET "firstName" = :firstName, "lastName" = :lastName WHERE email = :email`,
       {
         replacements: { firstName, lastName, email:req.mail },
-        type: db.QueryTypes.UPDATE, // Correct type
+        type: db.QueryTypes.UPDATE, // Correct type`
       }
     );
 

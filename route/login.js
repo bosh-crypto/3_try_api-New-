@@ -12,6 +12,7 @@ const { escapeLiteral } = require("pg");
 const moment = require("moment");
 const router = express.Router();
 const nodemailer = require("nodemailer");
+const {seendmail} = require("../middleware/smtpNodemailera")
 const upload = require("../config/multerconfig");
 const { Server, Socket } = require("socket.io");
 const { createServer } = require("node:http");
@@ -19,7 +20,6 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server);
 const rsa = require("node-rsa");
-
 const private_key = fs. readFileSync("./key/private.pem", "utf8");
 
 
@@ -33,9 +33,9 @@ const payload = {};
 payload.UserName = "Gatik";
 payload.userID = "11223344";
 
-const issueto = "GatikSharma";
-const sub = "gatikwrking@gmail.com";
-const exp = "99h";
+// const issueto = "GatikSharma";
+// const sub = "gatikwrking@gmail.com";
+// const exp = "99h";
 
 router.post("/signUp", [upload.single("file")], async (req, res) => {
   try {
@@ -124,6 +124,7 @@ router.post("/login", async (req, res) => {
       });
     }
 
+
     let userRecord; // Renamed 'result' to 'userRecord' for clarity
 
     const queryResult = await db.query(
@@ -142,6 +143,8 @@ router.post("/login", async (req, res) => {
     }
     // Assign the first (and only) user record to userRecord
     userRecord = queryResult[0];
+
+    //console.log("--------------------------------------------------------------------------------------------------------",userRecord.password)
 
     // 4. Validate the fetched user record's password field
     if (!userRecord.password || typeof userRecord.password !== "string") {
@@ -163,12 +166,25 @@ router.post("/login", async (req, res) => {
     );
     console.log(queryResultforblock);
 
-    if (queryResultforblock[0].ammountoftry > 3) {
-      return res.status(401).json({
-        status: "you are blocked",
-        message: "you dont have access of your account",
-      });
-    }
+    // if (queryResultforblock[0].ammountoftry > 3) {
+    //   return res.status(401).json({
+    //     status: "you are blocked",
+    //     message: "you dont have access of your account",
+    //   });
+    // }
+      if (queryResultforblock[0].ammountoftry > 3) {
+        seendmail()
+        return res.status(401).json({
+          status: "you are blocked",
+          message:
+            "you dont have access of your account we have also sent you confirmation mail that your account have been blocked",
+        });
+      } else {
+        res.status(400).json({
+          status: "Failed",
+          message: "Email or password is incorrect you have limited tryes",
+        });
+      }
     // 5. Comparing the plaintext password with the hashed password using bcrypt (Promise-based)
     const isMatch = await bcrypt.compare(password, queryResult[0].password);
 
@@ -204,41 +220,7 @@ router.post("/login", async (req, res) => {
           },
         }
       );
-
-      if (queryResultforblock[0].ammountoftry > 3) {
-        const transporter = nodemailer.createTransport({
-          secure: true,
-          host: "smtp.gmail.com",
-          port: 465,
-          auth: {
-            user: "gatikwrking@gmail.com",
-            pass: "mjklvaxvqumhltfr",
-          },
-        });
-        function sendMail(to, sub, msg) {
-          transporter.sendMail({
-            to: to,
-            subject: sub,
-            html: msg,
-          });
-          console.log("email Sent");
-        }
-        sendMail(
-          "gatikwrking@gmail.com",
-          "Blocked from your own api",
-          "This is a corfirmation mail that you are blocked from website access and not able t access the information"
-        );
-        return res.status(401).json({
-          status: "you are blocked",
-          message:
-            "you dont have access of your account we have also sent you confirmation mail that your account have been blocked",
-        });
-      } else {
-        res.status(400).json({
-          status: "Failed",
-          message: "Email or password is incorrect you have limited tryes",
-        });
-      }
+      //Needs Work Make it a MiddleWare
     }
   } catch (err) {
     console.log("error", err);

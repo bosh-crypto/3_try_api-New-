@@ -32,7 +32,7 @@ module.exports.isAuth = async (req, res, next) => {
     console.log("Error", err);
     return res.status(500).json({
       status: "Failed to load",
-      error: "Middleware is not working properly",
+      error: " Auth Middleware is not working properly",
       message: err,
     });
   }
